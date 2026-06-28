@@ -22,7 +22,4 @@ def load_env_file(path: Path = ROOT_DIR / ".env") -> None:
 load_env_file()
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash")
-GEMINI_EMBEDDING_MODEL = os.getenv(
-    "GEMINI_EMBEDDING_MODEL",
-    "models/gemini-embedding-001",
-)
+

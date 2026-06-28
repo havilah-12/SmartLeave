@@ -26,7 +26,10 @@ def init_db():
             email TEXT NOT NULL UNIQUE,
             department TEXT NOT NULL,
             leave_balance INTEGER NOT NULL,
-            salary INTEGER NOT NULL
+            salary INTEGER NOT NULL,
+            medical_leave_balance INTEGER NOT NULL DEFAULT 10,
+            max_annual_leaves INTEGER NOT NULL DEFAULT 25,
+            country TEXT NOT NULL DEFAULT 'USA'
         )
     ''')
 
@@ -49,6 +52,7 @@ def init_db():
             total_days INTEGER NOT NULL,
             paid_days INTEGER NOT NULL,
             unpaid_days INTEGER NOT NULL,
+            medical_days INTEGER NOT NULL DEFAULT 0,
             reason TEXT NOT NULL,
             status TEXT NOT NULL,
             FOREIGN KEY(employee_id) REFERENCES employees(employee_id)
@@ -57,11 +61,11 @@ def init_db():
 
     # Insert mock data for employees
     employees_data = [
-        ('EMP001', 'Alice Smith', 'alice@example.com', 'Engineering', 15, 120000),
-        ('EMP002', 'Bob Jones', 'bob@example.com', 'Human Resources', 20, 85000),
-        ('EMP003', 'Charlie Brown', 'charlie@example.com', 'Sales', 5, 95000),
-        ('EMP004', 'Diana Prince', 'diana@example.com', 'Marketing', 12, 105000),
-        ('EMP005', 'Evan Wright', 'evan@example.com', 'Finance', 8, 110000)
+        ('EMP001', 'Alice Smith', 'alice@example.com', 'Engineering', 15, 120000, 10),
+        ('EMP002', 'Bob Jones', 'bob@example.com', 'Human Resources', 20, 85000, 10),
+        ('EMP003', 'Charlie Brown', 'charlie@example.com', 'Sales', 5, 95000, 10),
+        ('EMP004', 'Diana Prince', 'diana@example.com', 'Marketing', 12, 105000, 10),
+        ('EMP005', 'Evan Wright', 'evan@example.com', 'Finance', 8, 110000, 10)
     ]
     
     # Programmatically generate EMP006 to EMP030
@@ -72,9 +76,9 @@ def init_db():
         dept = "Operations"
         balance = 10 + (i % 5)  # Assign varying balances between 10 and 14
         salary = 60000 + (i * 1500) # Varying mock salaries
-        employees_data.append((emp_id, name, email, dept, balance, salary))
+        employees_data.append((emp_id, name, email, dept, balance, salary, 10))
 
-    cursor.executemany("INSERT INTO employees (employee_id, name, email, department, leave_balance, salary) VALUES (?, ?, ?, ?, ?, ?)", employees_data)
+    cursor.executemany("INSERT INTO employees (employee_id, name, email, department, leave_balance, salary, medical_leave_balance) VALUES (?, ?, ?, ?, ?, ?, ?)", employees_data)
 
     # Insert mock data for holidays (YYYY-MM-DD format)
     holidays_data = [
@@ -98,11 +102,11 @@ def init_db():
     current_year_month = datetime.now().strftime("%Y-%m")
     mock_leaves = [
         # EMP001 already took 3 days this month (maxed out)
-        ('EMP001', f'{current_year_month}-02', f'{current_year_month}-04', 3, 3, 0, 'Personal Vacation', 'Approved'),
+        ('EMP001', f'{current_year_month}-02', f'{current_year_month}-04', 3, 3, 0, 0, 'Personal Vacation', 'Approved'),
         # EMP002 already took 2 days this month (1 day remaining before limit)
-        ('EMP002', f'{current_year_month}-10', f'{current_year_month}-11', 2, 2, 0, 'Family Event', 'Approved')
+        ('EMP002', f'{current_year_month}-10', f'{current_year_month}-11', 2, 2, 0, 0, 'Family Event', 'Approved')
     ]
-    cursor.executemany("INSERT INTO leave_applications (employee_id, start_date, end_date, total_days, paid_days, unpaid_days, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", mock_leaves)
+    cursor.executemany("INSERT INTO leave_applications (employee_id, start_date, end_date, total_days, paid_days, unpaid_days, medical_days, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", mock_leaves)
 
     conn.commit()
     conn.close()

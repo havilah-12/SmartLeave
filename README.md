@@ -37,9 +37,28 @@ Create a `.env` file in the root directory and add your Gemini API key:
 GEMINI_API_KEY="your_api_key_here"
 ```
 
-### 4. Run the ADK Web UI
-Start the local ADK developer server:
+### 4. Run the ADK Web UI Locally
+Start the local ADK developer server to test your agents (Parallel and Sequential) locally:
 ```bash
-uv run adk web src/agents
+uv run adk web src/workflows
 ```
-Open the provided `localhost` link in your browser to interact with the `coordinator_agent`.
+Open the provided `localhost` link in your browser to interact with the agents.
+
+### 5. Deploy to Google Cloud (Vertex AI)
+To deploy your agents natively to Google Cloud Vertex AI Agent Engine as a managed API service:
+
+**1. Log into Google Cloud:**
+```bash
+gcloud auth login
+gcloud auth application-default login
+```
+
+**2. Deploy the Parallel Agent:**
+```bash
+uv run adk deploy agent_engine src/workflows/leaves_agent_parallel --project YOUR_PROJECT_ID --region us-central1
+```
+
+**3. Deploy the Sequential Agent:**
+```bash
+uv run adk deploy agent_engine src/workflows/leaves_agent_sequential --project YOUR_PROJECT_ID --region us-central1
+```
