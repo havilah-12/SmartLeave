@@ -29,7 +29,7 @@ def init_db():
             salary INTEGER NOT NULL,
             medical_leave_balance INTEGER NOT NULL DEFAULT 10,
             max_annual_leaves INTEGER NOT NULL DEFAULT 25,
-            country TEXT NOT NULL DEFAULT 'USA'
+            country TEXT NOT NULL DEFAULT 'India'
         )
     ''')
 
@@ -59,6 +59,24 @@ def init_db():
         )
     ''')
 
+    # Create hr_admins table
+    cursor.execute('''
+        CREATE TABLE hr_admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hr_id TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL DEFAULT 'HR Administrator'
+        )
+    ''')
+
+    # Insert mock data for HR Admins
+    hr_data = [
+        ('HR001', 'Admin Sarah', 'sarah.admin@example.com', 'HR Director'),
+        ('HR002', 'Admin Mike', 'mike.admin@example.com', 'HR Manager')
+    ]
+    cursor.executemany("INSERT INTO hr_admins (hr_id, name, email, role) VALUES (?, ?, ?, ?)", hr_data)
+
     # Insert mock data for employees
     employees_data = [
         ('EMP001', 'Alice Smith', 'alice@example.com', 'Engineering', 15, 120000, 10),
@@ -68,31 +86,35 @@ def init_db():
         ('EMP005', 'Evan Wright', 'evan@example.com', 'Finance', 8, 110000, 10)
     ]
     
-    # Programmatically generate EMP006 to EMP030
-    for i in range(6, 31):
+    # Programmatically generate EMP006 to EMP030 with real names
+    indian_names = [
+        "Aarav Patel", "Anya Sharma", "Vihaan Singh", "Aditi Gupta", "Rohan Kumar", 
+        "Neha Reddy", "Kabir Das", "Priya Joshi", "Dev Malhotra", "Riya Verma", 
+        "Ishaan Nair", "Ananya Rao", "Karan Desai", "Meera Iyer", "Arjun Banerjee", 
+        "Pooja Mehta", "Yash Chawla", "Kavya Menon", "Dhruv Bhat", "Sneha Kapoor", 
+        "Aryan Pillai", "Sanya Ahuja", "Samir Gokhale", "Tara Chaudhry", "Vikram Sen"
+    ]
+    
+    for i, name in enumerate(indian_names, start=6):
         emp_id = f"EMP{i:03d}"
-        name = f"Test Employee {i}"
-        email = f"employee{i}@example.com"
+        email = f"{name.split()[0].lower()}@example.com"
         dept = "Operations"
-        balance = 10 + (i % 5)  # Assign varying balances between 10 and 14
+        balance = 25  # Give them their full max balance since they haven't taken leaves
         salary = 60000 + (i * 1500) # Varying mock salaries
         employees_data.append((emp_id, name, email, dept, balance, salary, 10))
 
     cursor.executemany("INSERT INTO employees (employee_id, name, email, department, leave_balance, salary, medical_leave_balance) VALUES (?, ?, ?, ?, ?, ?, ?)", employees_data)
 
-    # Insert mock data for holidays (YYYY-MM-DD format)
+    # Insert mock data for holidays (YYYY-MM-DD format) - Indian Public Holidays Only
     holidays_data = [
-        ('2026-01-01', 'New Year\'s Day'),
-        ('2026-01-19', 'Martin Luther King Jr. Day (US)'),
-        ('2026-01-26', 'Republic Day (India)'),
-        ('2026-03-03', 'Holi (India)'),
-        ('2026-05-25', 'Memorial Day (US)'),
-        ('2026-07-04', 'Independence Day (US)'),
-        ('2026-08-15', 'Independence Day (India)'),
-        ('2026-09-07', 'Labor Day (US)'),
-        ('2026-10-02', 'Mahatma Gandhi Jayanti (India)'),
-        ('2026-11-08', 'Diwali (India)'),
-        ('2026-11-26', 'Thanksgiving Day (US)'),
+        ('2026-01-26', 'Republic Day'),
+        ('2026-03-03', 'Holi'),
+        ('2026-03-20', 'Eid ul-Fitr'),
+        ('2026-05-01', 'Labour Day'),
+        ('2026-08-15', 'Independence Day'),
+        ('2026-10-02', 'Mahatma Gandhi Jayanti'),
+        ('2026-10-19', 'Dussehra'),
+        ('2026-11-08', 'Diwali'),
         ('2026-12-25', 'Christmas Day')
     ]
     cursor.executemany("INSERT INTO holidays (date, name) VALUES (?, ?)", holidays_data)

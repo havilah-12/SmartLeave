@@ -31,7 +31,6 @@ def holiday_lookup_node(ctx: Any, node_input: Any) -> Any:
     ctx.state["holiday_lookup_status"] = "found"
     return f"Found {len(holidays)} holidays"
 
-@node(name="fetch_existing_leaves_node")
 def fetch_existing_leaves_node(ctx: Any, node_input: Any) -> Any:
     emp_id = ctx.state.get("leave_request_employee_id")
     start = ctx.state.get("leave_request_start_date")

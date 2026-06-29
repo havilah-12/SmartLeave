@@ -69,7 +69,9 @@ def get_employee_details(employee_id: str) -> dict:
             e.max_annual_leaves,
             e.country,
             COALESCE(SUM(CASE WHEN strftime('%Y-%m', la.start_date) = strftime('%Y-%m', 'now') THEN la.total_days ELSE 0 END), 0) as leaves_taken_this_month,
-            COALESCE(SUM(CASE WHEN strftime('%Y', la.start_date) = strftime('%Y', 'now') AND strftime('%m', la.start_date) <= strftime('%m', 'now') THEN la.total_days ELSE 0 END), 0) as leaves_taken_this_year
+            COALESCE(SUM(CASE WHEN strftime('%Y', la.start_date) = strftime('%Y', 'now') AND strftime('%m', la.start_date) <= strftime('%m', 'now') THEN la.total_days ELSE 0 END), 0) as leaves_taken_this_year,
+            COALESCE(SUM(CASE WHEN strftime('%Y', la.start_date) = strftime('%Y', 'now') AND strftime('%m', la.start_date) <= strftime('%m', 'now') THEN la.paid_days ELSE 0 END), 0) as paid_leaves_taken_this_year,
+            COALESCE(SUM(CASE WHEN strftime('%Y', la.start_date) = strftime('%Y', 'now') AND strftime('%m', la.start_date) <= strftime('%m', 'now') THEN la.unpaid_days ELSE 0 END), 0) as unpaid_leaves_taken_this_year
         FROM employees e
         LEFT JOIN leave_applications la ON e.employee_id = la.employee_id AND la.status = 'Approved'
         WHERE e.employee_id = ?
@@ -83,6 +85,8 @@ def get_employee_details(employee_id: str) -> dict:
     
     leaves_taken_this_month = row[9]
     leaves_taken_this_year = row[10]
+    paid_leaves_taken = row[11]
+    unpaid_leaves_taken = row[12]
     
     # Get monthly breakdown for current year
     cursor.execute("""
@@ -120,6 +124,8 @@ def get_employee_details(employee_id: str) -> dict:
         "country": row[8],
         "leaves_taken_this_month": leaves_taken_this_month,
         "leaves_taken_this_year": leaves_taken_this_year,
+        "paid_leaves_taken_this_year": paid_leaves_taken,
+        "unpaid_leaves_taken_this_year": unpaid_leaves_taken,
         "Monthly Leaves Taken This Year:": monthly_leaves
     }
 
@@ -221,3 +227,55 @@ def revoke_leave(employee_id: str, target_date: str, current_date: str) -> dict:
         return {"status": "ERROR", "message": str(e)}
     finally:
         conn.close()
+
+def process_hr_approval(hr_emp_id: str, target_emp_id: str, action: str) -> dict:
+    """Process HR approval or rejection of a pending leave request."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Verify HR
+    cursor.execute("SELECT role FROM hr_admins WHERE hr_id = ?", (hr_emp_id,))
+    hr_row = cursor.fetchone()
+    if not hr_row:
+        conn.close()
+        return {"error": f"{hr_emp_id} is not an authorized HR administrator."}
+        
+    # Get target employee email
+    cursor.execute("SELECT email, name FROM employees WHERE employee_id = ?", (target_emp_id,))
+    emp_row = cursor.fetchone()
+    if not emp_row:
+        conn.close()
+        return {"error": f"Target employee {target_emp_id} not found."}
+    
+    target_email = emp_row[0]
+    target_name = emp_row[1]
+    
+    # Check pending leave
+    cursor.execute("SELECT id, paid_days, medical_days FROM leave_applications WHERE employee_id = ? AND status = 'Pending HR Approval'", (target_emp_id,))
+    leave_row = cursor.fetchone()
+    if not leave_row:
+        conn.close()
+        return {"error": f"No pending leave requests found for {target_emp_id}."}
+        
+    leave_id = leave_row[0]
+    paid_days = leave_row[1]
+    medical_days = leave_row[2]
+    new_status = 'Approved' if action.lower() == 'approve' else 'Rejected'
+    
+    cursor.execute("UPDATE leave_applications SET status = ? WHERE id = ?", (new_status, leave_id))
+    
+    if new_status == 'Approved':
+        if paid_days > 0:
+            cursor.execute("UPDATE employees SET leave_balance = leave_balance - ? WHERE employee_id = ?", (paid_days, target_emp_id))
+        if medical_days > 0:
+            cursor.execute("UPDATE employees SET medical_leave_balance = medical_leave_balance - ? WHERE employee_id = ?", (medical_days, target_emp_id))
+            
+    conn.commit()
+    conn.close()
+    
+    return {
+        "success": True, 
+        "email": target_email,
+        "name": target_name,
+        "new_status": new_status
+    }

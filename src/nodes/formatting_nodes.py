@@ -6,7 +6,6 @@ from google.genai import types, Client
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config.settings import logger, settings
-from database.operations import get_total_holidays_for_year
 
 @node(name="leave_summary_node")
 def leave_summary_node(ctx: Any, node_input: Any) -> types.Content:
@@ -79,7 +78,6 @@ def _generate_leave_summary(prompt: str) -> str:
     )
     return response.text.strip()
 
-@node(name="calculate_and_format_leave_node")
 def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
     emp_id = ctx.state.get("leave_request_employee_id")
     start_date = ctx.state.get("leave_request_start_date")
@@ -201,19 +199,8 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
     ctx.route = "end"
     
     # 5. Build summary with LLM for currency localization
-    current_year = datetime.now().strftime("%Y")
-    total_holidays_in_year = get_total_holidays_for_year(current_year)
-    max_annual_leaves = employee.get("max_annual_leaves", 25)
     country = employee.get("country", "USA")
     
-    holiday_str = f"{len(holiday_dates)}"
-    if len(holiday_names) > 0:
-        holiday_str += f" ({', '.join(holiday_names)})"
-        
-    weekend_str = f"{weekend_count}"
-    if len(weekend_dates) > 0:
-        weekend_str += f" ({', '.join(weekend_dates)})"
-        
     prompt = f"""You are an HR assistant formatting a leave summary. 
 The employee is from: {country}.
 Format the following data clearly as a markdown list exactly like the template below. 
@@ -221,13 +208,6 @@ CRUCIAL INSTRUCTION 1: For the Final Monthly Salary and Deduction Amount, you MU
 CRUCIAL INSTRUCTION 2: Do NOT add any conversational filler at the end like "Would you like to submit this request?" Just output the formatted list.
 
 Data to format:
-- Total Holidays this year: {total_holidays_in_year}
-- Total Paid leaves of this year: {max_annual_leaves}
-- No. of paid leaves per month: 2
-- Leaves Taken This Month: {leaves_this_month}
-- Holidays in this period: {holiday_str}
-- Weekends in this period: {weekend_str}
-***
 - Requested: {working_days} days
 - Paid Leave: {paid_days} days
 - Unpaid Leave (Loss of Pay): {unpaid_days} days
@@ -247,14 +227,7 @@ Data to format:
     except Exception as e:
         logger.error(f"API Error generating leave summary: {e}", exc_info=True)
         # Fallback in case of API error
-        summary = f"""- Total Holidays this year: {total_holidays_in_year}
-- Total Paid leaves of this year: {max_annual_leaves}
-- No. of paid leaves per month: 2
-- Leaves Taken This Month: {leaves_this_month}
-- Holidays in this period: {holiday_str}
-- Weekends in this period: {weekend_str}
-***
-- Requested: {working_days} days
+        summary = f"""- Requested: {working_days} days
 - Paid Leave: {paid_days} days
 - Unpaid Leave (Loss of Pay): {unpaid_days} days
 - IN-HAND SALARY OF THIS MONTH WILL BE: {final_salary} {deduction_str}{emergency_note}"""
