@@ -9,9 +9,9 @@ Employee Profile: [Name] ([ID])
 * Salary: $[Salary]
 * Annual Leave Balance: [Current Balance] out of [Max Annual Leaves] days
 * Medical Leave Balance: [Medical Balance] out of 10 days
-* Total Leaves Taken This Month: [Leaves this month] days
-* Total Leaves Taken This Year (Till Now): [Leaves this year] days
 * Total Paid Leaves Taken: [Total paid] days
 * Total Unpaid Leaves Taken: [Total unpaid] days
+* Total Leaves Taken This Month: [Leaves this month] days
+* Total Leaves Taken This Year (Till Now): [Leaves this year] days
 
 If the employee is not found, simply output 'Employee not found.' and do NOT mention anything about checking for overlaps. Do not ask any questions."""

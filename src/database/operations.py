@@ -40,7 +40,7 @@ def save_leave_application(
         conn.commit()
         msg = f"Leave approved and saved. Deducted {paid_days} paid days and {medical_days} medical days from {employee_id}."
         if status == "Pending HR Approval":
-            msg = "Request sent to HR for review. Please wait for approval, you will get a notification once reviewed."
+            msg = "Request sent to HR for review. Please wait for approval, you will get a notification email once reviewed."
 
         return {
             "status": "SUCCESS",

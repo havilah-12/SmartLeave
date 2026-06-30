@@ -19,7 +19,7 @@ def hr_node(ctx: Any, node_input: Any) -> Any:
         return types.Content(role="model", parts=[types.Part(text=f"**HR Action Failed:** {result['error']}")])
         
     action_word = "approved" if result["new_status"] == "Approved" else "rejected"
-    msg = f"**Successfully {action_word} pending leave for {target_emp_id} ({result['name']}).**\n\nAn automated email notification has been dispatched to `{result['email']}`."
+    msg = f"**Successfully {action_word} pending leave for {target_emp_id} ({result['name']}).**\n\nAn automated notification email has been dispatched to `{result['email']}`."
     
     # Clear HR action state
     ctx.state["hr_action_type"] = None
