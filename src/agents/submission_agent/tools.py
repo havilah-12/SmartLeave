@@ -4,7 +4,7 @@ from google.genai import types
 
 def submit_leave(tool_context: Context) -> str:
     """Submits the pending leave request to the database."""
-    res = submit_leave_node(tool_context, None)
+    res = submit_leave_node(tool_context, None) 
     if isinstance(res, types.Content):
         return res.parts[0].text
     return str(res)

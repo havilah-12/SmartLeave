@@ -74,11 +74,11 @@ uv run adk deploy agent_engine src/workflows/leaves_agent_sequential --project i
 
 **Test the Deployed Parallel Agent:**
 ```bash
-uv run adk web src/workflows/leaves_agent_parallel --session_service_uri "agentengine://7161161562902757376"
+uv run adk web src/workflows --session_service_uri "agentengine://7161161562902757376"
 ```
 
 **Test the Deployed Sequential Agent:**
 ```bash
-uv run adk web src/workflows/leaves_agent_sequential --session_service_uri "agentengine://5545776671560302592"
+uv run adk web src/workflows --session_service_uri "agentengine://5545776671560302592"
 ```
 *(If you deploy again in the future, just replace the numbers at the end of the `agentengine://` URI with your new Resource IDs!)*
