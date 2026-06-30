@@ -32,11 +32,12 @@ def get_holidays(tool_context: Context) -> dict:
         pass
         
     current_year = datetime.now().strftime("%Y")
-    total_holidays_in_year = get_total_holidays_for_year(current_year)
+    yearly_holidays_list = get_total_holidays_for_year(current_year)
     
     return {
         "holidays_in_period": holidays,
         "weekends_count": weekend_count,
         "weekend_dates": weekend_dates,
-        "total_holidays_this_year": total_holidays_in_year
+        "total_holidays_this_year_count": len(yearly_holidays_list),
+        "yearly_holidays_list": yearly_holidays_list
     }

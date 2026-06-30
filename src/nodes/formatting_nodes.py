@@ -157,6 +157,19 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
             paid_days = available_paid
             unpaid_days = working_days - available_paid
 
+    if not ctx.state.get("breakdown_confirmed"):
+        ctx.state["preview_status"] = "pending"
+        ctx.route = "end"
+        
+        breakdown_text = f"You are requesting {working_days} working days of leave. "
+        if medical_days > 0:
+            breakdown_text += f"We will allocate **{medical_days} Medical**, **{paid_days} Paid**, and **{unpaid_days} Unpaid**."
+        else:
+            breakdown_text += f"We will allocate **{paid_days} Paid** and **{unpaid_days} Unpaid**."
+            
+        breakdown_text += "\n\nDo you approve this breakdown? (Yes / No, change it to...)"
+        return types.Content(role="model", parts=[types.Part(text=breakdown_text)])
+
     # 3. Math for salary deduction
     annual_salary = employee.get("salary", 0)
     monthly_salary = annual_salary / 12

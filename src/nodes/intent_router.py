@@ -7,7 +7,7 @@ from google.genai import types, Client
 from config.settings import settings, logger
 
 class RouterDecision(BaseModel):
-    next_action: str = Field(description="One of: 'run_pipeline', 'ready_for_calculation', 'submit_leave', 'hr_action', 'end'")
+    next_action: str = Field(description="One of: 'run_pipeline', 'continue_calculation', 'submit_leave', 'hr_action', 'end'")
     missing_info_message: str = Field(description="If 'end', the message to display to the user.")
     extracted_employee_id: str = Field(description="Employee ID if found in history")
     extracted_start_date: str = Field(description="Start Date (YYYY-MM-DD) if found")
@@ -17,6 +17,7 @@ class RouterDecision(BaseModel):
     hr_action_type: str = Field(description="If next_action is 'hr_action', one of: 'approve', 'reject'. Empty otherwise.")
     hr_target_employee_id: str = Field(description="If next_action is 'hr_action', the employee ID they are taking action on.")
     hr_passcode: str = Field(default="", description="If next_action is 'hr_action', the 6-character unique passcode provided by the HR.")
+    is_revoke_intent: bool = Field(default=False, description="True if the user wants to cancel or revoke an existing leave.")
 
 @node(name="intent_router_node")
 def intent_router_node(ctx: Any, node_input: Any) -> Any:
@@ -34,6 +35,7 @@ def intent_router_node(ctx: Any, node_input: Any) -> Any:
         "leave_type_preference": ctx.state.get("leave_type_preference"),
         "employee_lookup_status": ctx.state.get("employee_lookup_status"),
         "has_leave_overlap": ctx.state.get("has_leave_overlap"),
+        "preview_status": ctx.state.get("preview_status"),
         "confirmation_status": ctx.state.get("confirmation_status")
     }
         
@@ -51,15 +53,12 @@ CRITICAL INSTRUCTION ON DATES: You MUST convert any relative dates (e.g., "next 
 
 RULES:
 1. If the user states they are HR (e.g. "I am HR001") AND asks to approve or reject/cancel a pending leave for another employee (e.g. "Approve EMP009's leave") AND provides their passcode (e.g. "passcode SAR123"): output next_action='hr_action', extract their HR ID into 'extracted_employee_id', their passcode into 'hr_passcode', set 'hr_action_type' to 'approve' or 'reject', and set 'hr_target_employee_id'.
-2. If confirmation_status is 'pending' and the user confirms they want to submit (e.g., 'yes', 'do it'), output next_action='submit_leave'. If they decline (e.g., 'no', 'cancel'), output next_action='end' and say it was cancelled.
-3. STRICT RULE: Before you can do anything else, you MUST have Employee ID, Start Date, End Date, AND Reason. If ANY of these 4 are missing (especially Reason), output next_action='end' and ask the user for the missing ones. Do NOT output run_pipeline if Reason is missing!
-4. If employee_lookup_status is 'not_found', output next_action='end' and inform the user their Employee ID was invalid and they need to provide a correct one.
-5. If ALL 4 required slots (ID, Start, End, Reason) are present and employee_lookup_status is None (meaning we haven't checked the DB yet), output next_action='run_pipeline'.
-6. If employee_lookup_status IS 'found', check if there is an overlap (has_leave_overlap). If True, output next_action='end' and tell them to pick new dates.
-7. If employee is found, no overlap, but they haven't specified a leave_type preference (paid/unpaid/medical), output next_action='end' to ask them.
-8. If everything is found, verified, and preference is set (and confirmation_status is not pending), output next_action='ready_for_calculation'.
-9. If the user wants to revoke a leave, output next_action='submit_leave'.
-10. If it's just a greeting or unrelated, output next_action='end' and provide a greeting in missing_info_message. It MUST say exactly: 'Hi, I'm your Smart Leave Assistant! I can help you easily apply for leave, check your balances, and cancel existing requests.'
+2. If preview_status is 'pending' and the user confirms they approve the Paid/Unpaid breakdown, output next_action='continue_calculation'. If they decline and specify a new preference (e.g. "make it unpaid"), extract the new preference into 'extracted_leave_type' and output next_action='run_pipeline'.
+3. If confirmation_status is 'pending' and the user confirms they want to submit (e.g., 'yes', 'do it'), output next_action='submit_leave'. If they decline (e.g., 'no', 'cancel'), output next_action='end' and say it was cancelled.
+4. If the user wants to revoke or cancel an existing leave: you MUST have their Employee ID and the Start Date of the leave. If either is missing, output next_action='end' and ask for the missing details. If both are present, output next_action='submit_leave' and set is_revoke_intent=true.
+5. STRICT RULE: For APPLYING for a new leave, you MUST have Employee ID, Start Date, End Date, AND Reason. If ANY of these 4 are missing, output next_action='end' and ask the user for the missing ones. Do NOT output run_pipeline if they are missing!
+6. If ALL 4 required slots are present for a new leave and preview_status is NOT pending and confirmation_status is NOT pending, output next_action='run_pipeline'.
+6. If it's just a greeting or unrelated, output next_action='end' and provide a greeting in missing_info_message. It MUST say exactly: 'Hi, I'm your Smart Leave Assistant! I can help you easily apply for leave, check your balances, and cancel existing requests.'
 
 Extract all slots you can find and preserve existing ones.
 """
@@ -108,10 +107,38 @@ Extract all slots you can find and preserve existing ones.
         
     if dates_changed:
         ctx.state["has_leave_overlap"] = None
-        ctx.state["employee_lookup_status"] = None
-        ctx.state["holiday_lookup_status"] = None
-        # Override action to force it to re-run pipeline on the new dates!
-        decision.next_action = "run_pipeline"
+        
+        # If employee is already found, we can just fetch holidays and check overlap here to avoid LLM calls
+        if ctx.state.get("employee_lookup_status") == "found":
+            from database.operations import get_holidays, check_leave_overlap
+            
+            has_overlap = check_leave_overlap(
+                ctx.state["leave_request_employee_id"], 
+                ctx.state["leave_request_start_date"], 
+                ctx.state["leave_request_end_date"]
+            )
+            ctx.state["has_leave_overlap"] = has_overlap
+            
+            holidays = get_holidays(
+                ctx.state["leave_request_start_date"], 
+                ctx.state["leave_request_end_date"]
+            )
+            ctx.state["holiday_results"] = holidays
+            
+            if has_overlap:
+                decision.next_action = "end"
+                decision.missing_info_message = "It looks like you already have an overlapping leave scheduled for these dates. Please pick new dates."
+            else:
+                decision.next_action = "continue_calculation"
+        else:
+            ctx.state["employee_lookup_status"] = None
+            ctx.state["holiday_lookup_status"] = None
+            # Override action to force it to re-run pipeline on the new dates!
+            decision.next_action = "run_pipeline"
+        
+    if decision.next_action == "continue_calculation":
+        ctx.state["breakdown_confirmed"] = True
+        ctx.state["preview_status"] = None
         
     ctx.route = decision.next_action
     
@@ -121,11 +148,17 @@ Extract all slots you can find and preserve existing ones.
             ctx.state["employee_lookup_status"] = None
         return types.Content(role="model", parts=[types.Part(text=decision.missing_info_message)])
     elif decision.next_action == "run_pipeline":
-        return types.Content(role="model", parts=[types.Part(text="Fetching your profile and checking the holiday calendar...")])
-    elif decision.next_action == "ready_for_calculation":
-        return types.Content(role="model", parts=[types.Part(text="Calculating your leave balance and salary deductions...")])
+        ctx.state["preview_status"] = None
+        return types.Content(role="model", parts=[types.Part(text="Fetching your profile, checking the holiday calendar, and calculating your leave balance...")])
+    elif decision.next_action == "continue_calculation":
+        if dates_changed:
+            return types.Content(role="model", parts=[types.Part(text="Recalculating your leave breakdown for the new dates...")])
+        return types.Content(role="model", parts=[types.Part(text="Calculating final salary deductions...")])
     elif decision.next_action == "submit_leave":
-        return types.Content(role="model", parts=[types.Part(text="Finalizing your leave submission...")])
+        if decision.is_revoke_intent:
+            return types.Content(role="model", parts=[types.Part(text="Processing your leave revocation...")])
+        else:
+            return types.Content(role="model", parts=[types.Part(text="Finalizing your leave submission...")])
         
     elif decision.next_action == "hr_action":
         return types.Content(role="model", parts=[types.Part(text="Processing HR authorization...")])

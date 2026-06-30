@@ -142,17 +142,17 @@ def get_holidays(start_date: str, end_date: str) -> list[dict]:
 
     return [{"date": row[0], "name": row[1]} for row in rows]
 
-def get_total_holidays_for_year(year: str) -> int:
-    """Retrieve the total number of holidays defined for a specific year."""
+def get_total_holidays_for_year(year: str) -> list:
+    """Retrieve the full list of holidays defined for a specific year."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT COUNT(*) FROM holidays WHERE strftime('%Y', date) = ?",
+        "SELECT date, name FROM holidays WHERE strftime('%Y', date) = ? ORDER BY date ASC",
         (year,),
     )
-    count = cursor.fetchone()[0]
+    rows = cursor.fetchall()
     conn.close()
-    return count
+    return [{"date": row[0], "name": row[1]} for row in rows]
 
 def check_leave_overlap(employee_id: str, start_date: str, end_date: str) -> bool:
     """Check if the requested dates overlap with an already approved leave."""
