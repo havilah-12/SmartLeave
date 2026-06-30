@@ -124,46 +124,38 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
     is_emergency = "emergency" in reason.lower() or "medical" in reason.lower() or "hospital" in reason.lower()
     leave_type_preference = ctx.state.get("leave_type_preference", "").lower()
     medical_balance = employee.get("medical_leave_balance", 0)
+    leave_balance = employee.get("leave_balance", 0)
     
     paid_days = 0
     unpaid_days = 0
     medical_days = 0
     emergency_note = ""
 
-    if leave_type_preference == "medical":
+    if leave_type_preference == "medical" or (is_emergency and leave_type_preference != "unpaid"):
         medical_days = min(working_days, medical_balance)
         emergency_note = f"\n- Company Insurance Policy: NOTIFIED\n- Note: {medical_days} days deducted from your Medical Leave Balance."
         remaining_days = working_days - medical_days
         if remaining_days > 0:
-            paid_days_allowed = max(0, 2 - leaves_this_month)
-            if remaining_days <= paid_days_allowed:
+            available_paid = max(0, leave_balance)
+            if remaining_days <= available_paid:
                 paid_days = remaining_days
                 emergency_note += f" (Remaining {remaining_days} days covered by regular paid leave)."
             else:
-                paid_days = paid_days_allowed
-                unpaid_days = remaining_days - paid_days_allowed
+                paid_days = available_paid
+                unpaid_days = remaining_days - available_paid
                 emergency_note += f" (Remaining {remaining_days} days: {paid_days} paid, {unpaid_days} unpaid)."
     elif leave_type_preference == "unpaid":
         paid_days = 0
         unpaid_days = working_days
         if is_emergency:
             emergency_note = "\n- Note: Leave granted as unpaid due to your preference (Medical Emergency)."
-    elif is_emergency:
-        paid_days_allowed = working_days
-        if leaves_this_month >= 2:
-            emergency_note = "\n- Note: Leave granted due to emergency health reasons, but will result in loss of pay as you have exceeded your monthly paid limit."
-            paid_days = 0
-            unpaid_days = working_days
-        else:
-            paid_days = working_days
-            unpaid_days = 0
     else:
-        paid_days_allowed = max(0, 2 - leaves_this_month)
-        if working_days <= paid_days_allowed:
+        available_paid = min(max(0, 2 - leaves_this_month), max(0, leave_balance))
+        if working_days <= available_paid:
             paid_days = working_days
         else:
-            paid_days = paid_days_allowed
-            unpaid_days = working_days - paid_days_allowed
+            paid_days = available_paid
+            unpaid_days = working_days - available_paid
 
     # 3. Math for salary deduction
     annual_salary = employee.get("salary", 0)

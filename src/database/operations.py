@@ -228,17 +228,21 @@ def revoke_leave(employee_id: str, target_date: str, current_date: str) -> dict:
     finally:
         conn.close()
 
-def process_hr_approval(hr_emp_id: str, target_emp_id: str, action: str) -> dict:
+def process_hr_approval(hr_emp_id: str, target_emp_id: str, action: str, hr_passcode: str) -> dict:
     """Process HR approval or rejection of a pending leave request."""
     conn = get_connection()
     cursor = conn.cursor()
     
     # Verify HR
-    cursor.execute("SELECT role FROM hr_admins WHERE hr_id = ?", (hr_emp_id,))
+    cursor.execute("SELECT role, passcode FROM hr_admins WHERE hr_id = ?", (hr_emp_id,))
     hr_row = cursor.fetchone()
     if not hr_row:
         conn.close()
         return {"error": f"{hr_emp_id} is not an authorized HR administrator."}
+        
+    if hr_row[1] != hr_passcode:
+        conn.close()
+        return {"error": f"Invalid passcode for {hr_emp_id}."}
         
     # Get target employee email
     cursor.execute("SELECT email, name FROM employees WHERE employee_id = ?", (target_emp_id,))

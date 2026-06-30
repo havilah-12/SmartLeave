@@ -16,6 +16,7 @@ class RouterDecision(BaseModel):
     extracted_leave_type: str = Field(description="paid, unpaid, or medical. Empty if not yet provided.")
     hr_action_type: str = Field(description="If next_action is 'hr_action', one of: 'approve', 'reject'. Empty otherwise.")
     hr_target_employee_id: str = Field(description="If next_action is 'hr_action', the employee ID they are taking action on.")
+    hr_passcode: str = Field(default="", description="If next_action is 'hr_action', the 6-character unique passcode provided by the HR.")
 
 @node(name="intent_router_node")
 def intent_router_node(ctx: Any, node_input: Any) -> Any:
@@ -49,7 +50,7 @@ TODAY'S DATE: {today_str}
 CRITICAL INSTRUCTION ON DATES: You MUST convert any relative dates (e.g., "next Monday", "upcoming Friday", "tomorrow", "next week") or dates missing a year (e.g., "July 1st") into strict `YYYY-MM-DD` format using TODAY'S DATE ({today_str}) as the mathematical reference point. Never output relative words in the extracted date fields!
 
 RULES:
-1. If the user states they are HR (e.g. "I am HR001") AND asks to approve or reject/cancel a pending leave for another employee (e.g. "Approve EMP009's leave"): output next_action='hr_action', extract their HR ID into 'extracted_employee_id', set 'hr_action_type' to 'approve' or 'reject', and set 'hr_target_employee_id'.
+1. If the user states they are HR (e.g. "I am HR001") AND asks to approve or reject/cancel a pending leave for another employee (e.g. "Approve EMP009's leave") AND provides their passcode (e.g. "passcode SAR123"): output next_action='hr_action', extract their HR ID into 'extracted_employee_id', their passcode into 'hr_passcode', set 'hr_action_type' to 'approve' or 'reject', and set 'hr_target_employee_id'.
 2. If confirmation_status is 'pending' and the user confirms they want to submit (e.g., 'yes', 'do it'), output next_action='submit_leave'. If they decline (e.g., 'no', 'cancel'), output next_action='end' and say it was cancelled.
 3. STRICT RULE: Before you can do anything else, you MUST have Employee ID, Start Date, End Date, AND Reason. If ANY of these 4 are missing (especially Reason), output next_action='end' and ask the user for the missing ones. Do NOT output run_pipeline if Reason is missing!
 4. If employee_lookup_status is 'not_found', output next_action='end' and inform the user their Employee ID was invalid and they need to provide a correct one.
@@ -102,6 +103,8 @@ Extract all slots you can find and preserve existing ones.
         ctx.state["hr_action_type"] = decision.hr_action_type
     if decision.hr_target_employee_id:
         ctx.state["hr_target_employee_id"] = decision.hr_target_employee_id
+    if hasattr(decision, 'hr_passcode') and decision.hr_passcode:
+        ctx.state["hr_passcode"] = decision.hr_passcode
         
     if dates_changed:
         ctx.state["has_leave_overlap"] = None

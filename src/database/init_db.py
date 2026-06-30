@@ -16,6 +16,7 @@ def init_db():
     cursor.execute("DROP TABLE IF EXISTS employees")
     cursor.execute("DROP TABLE IF EXISTS holidays")
     cursor.execute("DROP TABLE IF EXISTS leave_applications")
+    cursor.execute("DROP TABLE IF EXISTS hr_admins")
 
     # Create employees table
     cursor.execute('''
@@ -66,16 +67,17 @@ def init_db():
             hr_id TEXT NOT NULL UNIQUE,
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
-            role TEXT NOT NULL DEFAULT 'HR Administrator'
+            role TEXT NOT NULL DEFAULT 'HR Administrator',
+            passcode TEXT NOT NULL
         )
     ''')
 
     # Insert mock data for HR Admins
     hr_data = [
-        ('HR001', 'Admin Sarah', 'sarah.admin@example.com', 'HR Director'),
-        ('HR002', 'Admin Mike', 'mike.admin@example.com', 'HR Manager')
+        ('HR001', 'Admin Sarah', 'sarah.admin@example.com', 'HR Director', 'SAR123'),
+        ('HR002', 'Admin Mike', 'mike.admin@example.com', 'HR Manager', 'MIK987')
     ]
-    cursor.executemany("INSERT INTO hr_admins (hr_id, name, email, role) VALUES (?, ?, ?, ?)", hr_data)
+    cursor.executemany("INSERT INTO hr_admins (hr_id, name, email, role, passcode) VALUES (?, ?, ?, ?, ?)", hr_data)
 
     # Insert mock data for employees
     employees_data = [

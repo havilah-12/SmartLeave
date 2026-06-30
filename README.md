@@ -24,15 +24,22 @@ This system fully satisfies all technical requirements:
 ### 1. Project Setup & Database Initialization
 *Run these commands to set up your environment from scratch.*
 
-**Install Dependencies:**
+**Step 1: Set up the environment and install dependencies**
 ```bash
+uv venv
 uv sync
 ```
 
-**Initialize and Seed the Database:**
+**Step 2: Configure your API Key**
+Create a `.env` file in the root directory (or export it in your terminal) with your Gemini API key:
+```env
+GEMINI_API_KEY="your_api_key_here"
+```
+
+**Step 3: Initialize the Database**
+This command will create the SQLite database and automatically populate it with mock employees, HR admins, and public holidays.
 ```bash
-python src/database/init_db.py
-python src/database/seed_data.py
+uv run python src/database/init_db.py
 ```
 
 ### 2. Local Testing (ADK Web UI)
