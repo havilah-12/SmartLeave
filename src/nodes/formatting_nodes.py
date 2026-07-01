@@ -95,6 +95,7 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
         return types.Content(role="model", parts=[types.Part(text=f"Error parsing dates: {e}")])
         
     working_days = 0
+    working_dates = []
     holiday_dates = []
     holiday_names = []
     
@@ -117,6 +118,7 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
             weekend_dates.append(current.strftime("%Y-%m-%d"))
         elif current not in holiday_dates:
             working_days += 1
+            working_dates.append(current)
         current += timedelta(days=1)
         
     # 2. Policy rules (max 2 per month)
@@ -177,7 +179,7 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
     deduction = round(daily_rate * unpaid_days, 2)
     final_salary = round(monthly_salary - deduction, 2)
     
-    deduction_str = "(NO DEDUCTIONS)" if deduction == 0 else f"(DEDUCTED: {deduction})"
+    deduction_str = f"{deduction}"
     
     # 4. State updates
     intent = ctx.state.get("intent", "apply_leave")
@@ -203,6 +205,17 @@ def calculate_and_format_leave_node(ctx: Any, node_input: Any) -> Any:
         
     ctx.route = "end"
     
+    def get_date_range_str(dates):
+        if not dates: return ""
+        if len(dates) == 1: return f"({dates[0].strftime('%Y-%m-%d')})"
+        return f"({dates[0].strftime('%Y-%m-%d')} to {dates[-1].strftime('%Y-%m-%d')})"
+
+    paid_dates = working_dates[medical_days:medical_days+paid_days]
+    unpaid_dates = working_dates[medical_days+paid_days:medical_days+paid_days+unpaid_days]
+    
+    paid_str = get_date_range_str(paid_dates)
+    unpaid_str = get_date_range_str(unpaid_dates)
+
     # 5. Build summary with LLM for currency localization
     country = employee.get("country", "USA")
     
@@ -213,9 +226,10 @@ CRUCIAL INSTRUCTION 1: For the Final Monthly Salary and Deduction Amount, you MU
 CRUCIAL INSTRUCTION 2: Do NOT add any conversational filler at the end like "Would you like to submit this request?" Just output the formatted list.
 
 Data to format:
-- Requested: {working_days} days
-- Paid Leave: {paid_days} days
-- Unpaid Leave (Loss of Pay): {unpaid_days} days
+- Leave Reason: {reason}
+- Requested: {working_days} days ({start_date} to {end_date})
+- Paid Leave: {paid_days} days {paid_str}
+- Unpaid Leave (Loss of Pay): {unpaid_days} days {unpaid_str}
 - Final Monthly Salary: {final_salary}
 - Deduction Amount: {deduction_str}"""
 
@@ -232,9 +246,10 @@ Data to format:
     except Exception as e:
         logger.error(f"API Error generating leave summary: {e}", exc_info=True)
         # Fallback in case of API error
-        summary = f"""- Requested: {working_days} days
-- Paid Leave: {paid_days} days
-- Unpaid Leave (Loss of Pay): {unpaid_days} days
+        summary = f"""- Leave Reason: {reason}
+- Requested: {working_days} days ({start_date} to {end_date})
+- Paid Leave: {paid_days} days {paid_str}
+- Unpaid Leave (Loss of Pay): {unpaid_days} days {unpaid_str}
 - IN-HAND SALARY OF THIS MONTH WILL BE: {final_salary} {deduction_str}{emergency_note}"""
         if status == "Pending HR Approval":
             summary += "\n- HR Review Required: Because this request exceeds 2 unpaid days, it will be routed to HR for manual review."

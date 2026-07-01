@@ -21,9 +21,10 @@ graph TD
     EmpAgent --> Join[join_node]
     HolAgent --> Join
     
-    Join --> IntentRouter
+    Join --> ValNode[validation_node]
+    ValNode -- 'end' (Overlap) --> End
+    ValNode -- 'continue' --> CalcAgent[calculation_agent]
     
-    IntentRouter -- 'ready_for_calculation' --> CalcAgent[calculation_agent]
     CalcAgent --> IntentRouter
     
     IntentRouter -- 'submit_leave' --> SubAgent[submission_agent]
@@ -35,7 +36,7 @@ graph TD
 ### Flow Breakdown
 1. **Routing (`intent_router_node`)**: Evaluates user input. Extracts entities (Employee ID, Start Date, End Date, Reason). 
 2. **Parallel Fetching (`run_pipeline`)**: If all entities are gathered, it simultaneously invokes the `employee_agent` (to check the SQLite DB for employee data) and the `holiday_agent` (to check the SQLite DB for public holidays). 
-3. **Calculation (`ready_for_calculation`)**: After joining the parallel data, it routes to `calculation_agent` to deduct weekends and holidays, calculate the final working days, and apply the cascading policy limits (Medical → Paid → Unpaid).
+3. **Validation & Calculation (`continue`)**: After joining the parallel data, it passes through the `validation_node` to ensure there are no overlapping leaves, bypassing the LLM intent router. If validated, it routes directly to `calculation_agent` to deduct weekends and holidays, calculate the final working days, and apply the cascading policy limits (Medical → Paid → Unpaid).
 4. **Confirmation**: Stops and asks the user for explicit confirmation before submitting.
 5. **Submission (`submit_leave`)**: Upon "Yes", invokes the `submission_agent` to write to the database.
 
